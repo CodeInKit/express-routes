@@ -1,33 +1,34 @@
 const express = require('express');
 const app = express();
-const bodyParser = require('body-parser')
-const RESTPORT = process.env.RESTPORT || '8080'; 
 const _ = require('lodash');
-const cors = require('cors');
-const compression = require('compression')
 
-module.exports = (data) => (exec) => {
-  const restRoutes = data.routes;
+function awsRouteRegister(flowName, exec, req, res) {
+  const response = await exec(flowName, {headers: req.headers, body: req.body, pathParameters: req.params, queryStringParameters: req.query})
+  .catch(error => ({statusCode: 500, body:{error: error.message}}));
+
+  res.status(response.statusCode).send(response.body);
+}
+
+function standardRouteRegister(flowName, exec, req, res) {
+  const response = await exec(flowName, {headers: req.headers, body: req.body, params: req.params, query: req.query});
   
-  app.use(bodyParser.urlencoded({ extended: false }));
-  app.use(bodyParser.json());
-  app.use(cors());
-  app.use(compression({level: 1}))
+  res.send(response);
+}
+
+module.exports = (data = {isAwsRoutes: false, port: 8080, routes: {}}) => (exec) => {
+  const restRoutes = data.routes;
 
   _.each(restRoutes, (flowName, routeName) => {
     const [method, url] = routeName.split(' ');
 
     app[method](url, async (req, res) => {
-      const response = await exec(flowName, {headers: req.headers, body: req.body, params: req.params, query: req.query});
-      if(response.file) {
-        return res.sendFile(response.file);
-      } 
-      
-      res.send(response);
+      data.isAwsRoutes 
+        ? awsRouteRegister(flowName, exec, req, res)
+        : standardRouteRegister(flowName, exec, req, res);
     });
   });
 
-  app.listen(RESTPORT, () => {
-    console.log(`${new Date()} rest server is listening on port ${RESTPORT}`);
+  app.listen(data.port, () => {
+    console.log(`${new Date()} rest server is listening on port ${data.port}`);
   });
 }
