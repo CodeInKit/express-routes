@@ -12,7 +12,13 @@ async function awsRouteRegister(flowName, exec, statefulObj, req, res) {
 }
 
 async function standardRouteRegister(flowName, exec, statefulObj, req, res) {
-  const response = await exec(flowName, {headers: req.headers, body: req.body, params: req.params, query: req.query}, {res, req, ...statefulObj});
+  const response = 
+    await exec(flowName, {headers: req.headers, body: req.body, params: req.params, query: req.query}, {res, req, ...statefulObj})
+    .catch(error => ({error: error.message}));
+  
+  if(_.has(response, 'error')) {
+    return res.status(500).send(response);
+  }
   
   res.send(response);
 }
